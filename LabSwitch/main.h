@@ -15,13 +15,13 @@ enum NetLinkType { /* Types of linkls */
 };
 
 struct net_node { /* Network node, e.g., host or switch */
-	enum NetNodeType type;
+	enum NetNodeType type;	//either Host or Switch
 	int id;
 	struct net_node *next;
 };
 
 struct net_port { /* port to communicate with another node */
-	enum NetLinkType type;
+	enum NetLinkType type;  //either Pipe or Socket
 	int pipe_host_id;
 	int pipe_send_fd;
 	int pipe_recv_fd;
@@ -44,5 +44,3 @@ struct packet { /* struct for a packet */
 #define PKT_PING_REPLY		1
 #define PKT_FILE_UPLOAD_START	2
 #define PKT_FILE_UPLOAD_END	3
-
-
