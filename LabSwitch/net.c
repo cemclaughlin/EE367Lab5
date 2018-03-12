@@ -465,6 +465,16 @@ int load_net_data_file()
             }
             else {	//needs 'S' type for switch
                 printf(" net.c: Unidentified Node Type\n");
+                /*fscanf(fp, " %d ", &node_id);
+                  g_net_node[i].type = SWITCH;
+                  g_net_node[i].id = node_id;
+                */
+                /*
+                create a test for sockets
+                scan next char
+                if char is H or S, create switch node and unget char.
+                else, run socket setup
+                */
             }
 
             if (i != node_id) {
