@@ -409,6 +409,7 @@ void create_port_list()
             g_port_list = p0;
 
         }
+        //socket usage?
     }
 
 }
