@@ -28,5 +28,3 @@ struct man_port_at_man {  /* Port located at the host */
  * Main loop for the manager.  
  */
 void man_main();
-
-

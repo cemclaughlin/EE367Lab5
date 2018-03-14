@@ -32,5 +32,11 @@ struct job_queue {
 };
 
 void host_main(int host_id);
+/*
+void job_q_add(struct job_queue *j_q, struct host_job *j);
 
+struct host_job *job_q_remove(struct job_queue *j_q);
 
+void job_q_init(struct job_queue *j_q);
+
+int job_q_num(struct job_queue *j_q); */
