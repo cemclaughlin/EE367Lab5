@@ -409,7 +409,7 @@ void create_port_list()
             g_port_list = p0;
 
         }
-        //socket usage?
+        //TODO: SOCKETS
     }
 
 }
@@ -512,7 +512,7 @@ int load_net_data_file()
                 g_net_link[i].pipe_node0 = node0;
                 g_net_link[i].pipe_node1 = node1;
             }
-            else {	//need 'S' type for switch
+            else {	//need 'S' type for socket   //TODO: SOCKETS
                 printf("   net.c: Unidentified link type\n");
             }
 
@@ -539,7 +539,7 @@ int load_net_data_file()
                    g_net_link[i].pipe_node0,
                    g_net_link[i].pipe_node1);
         }
-        else if (g_net_link[i].type == SOCKET) {
+        else if (g_net_link[i].type == SOCKET) { //TODO: SOCKETS
             printf("   Socket: to be constructed (net.c)\n");
         }
     }

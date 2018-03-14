@@ -59,6 +59,10 @@ int packet_recv(struct net_port *port, struct packet *p)
             //		(int) p->dst);
         }
     }
-
+    //TODO: SOCKETS
+    /*if(port->type == SOCKET) {
+        n = recv();
+    }
+    */
     return(n);
 }
