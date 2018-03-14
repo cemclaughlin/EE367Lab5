@@ -473,11 +473,13 @@ int load_net_data_file()
               printf(" net.c: Unidentified Node Type\n");
             }
 
-            if (i != node_id) {
+            //would disallow dup ids in single network
+            //forces dup ids between networks
+            /*if (i != node_id) {
                 printf(" net.c: Incorrect node id\n");
                 fclose(fp);
                 return(0);
-            }
+            }*/
         }
     }
     /*
