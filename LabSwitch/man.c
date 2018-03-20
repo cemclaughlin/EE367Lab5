@@ -287,15 +287,5 @@ void man_main()
         default:
             printf("\nInvalid, you entered %c\n\n", cmd);
         }
-	usleep(TENMILLISEC);
-	usleep(TENMILLISEC);
-	usleep(TENMILLISEC);
-	usleep(TENMILLISEC);
-	usleep(TENMILLISEC);
-	usleep(TENMILLISEC);
-	usleep(TENMILLISEC);
-	usleep(TENMILLISEC);
-	usleep(TENMILLISEC);
-	usleep(TENMILLISEC);
     }
 }
