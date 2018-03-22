@@ -16,6 +16,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+// #include <netinet/in.h>
+#include <netdb.h>
+#include <sys/socket.h>
+
+// #include <arpa/inet.h>
 
 #define _GNU_SOURCE
 #include <fcntl.h>
@@ -26,11 +31,12 @@
 #include "host.h"
 #include "net.h"
 #include "packet.h"
-
+#include "switch.h"
 
 #define MAX_FILE_NAME 100
 #define PIPE_READ 0
 #define PIPE_WRITE 1
+#define BACKLOG 10	 // how many pending connections queue will hold
 
 enum bool {FALSE, TRUE};
 
@@ -43,6 +49,10 @@ struct net_link {
     enum NetLinkType type;
     int pipe_node0;
     int pipe_node1;
+    char socket_url0[40];
+    char socket_url1[40];
+    char socket_port0[5];
+    char socket_port1[5];
 };
 
 
@@ -350,7 +360,7 @@ void create_node_list()
     g_node_list = NULL;
     for (i=0; i<g_net_node_num; i++) {
         p = (struct net_node *) malloc(sizeof(struct net_node));
-        p->id = i;
+        p->id = g_net_node[i].id;
         p->type = g_net_node[i].type;
         p->next = g_node_list;
         g_node_list = p;
@@ -369,7 +379,13 @@ void create_port_list()
     int node0, node1;
     int fd01[2];
     int fd10[2];
-    int i;
+    int i, j;
+    struct addrinfo hints, *servinfo, *p;
+    int rv;
+    int yes=1;
+
+    //for socket creation
+
 
     g_port_list = NULL;
     for (i=0; i<g_net_link_num; i++) {
@@ -410,7 +426,69 @@ void create_port_list()
 
         }
         //TODO: SOCKETS
+        else{
+          memset(&hints, 0, sizeof hints);
+          hints.ai_family = AF_UNSPEC;
+          hints.ai_socktype = SOCK_STREAM;
+          //hints.ai_flags = AI_PASSIVE; // use my IP
+
+          //using strings for socket_url 0/1 may need to change to char arrays
+          if ((rv = getaddrinfo(g_net_link[i].socket_url0, g_net_link[i].socket_port0, &hints, &servinfo)) != 0) {
+            fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+            return;
+          }
+
+          // loop through all the results and bind to the first we can
+          for(p = servinfo; p != NULL; p = p->ai_next) {
+            if ((node0 = socket(p->ai_family, p->ai_socktype,
+                p->ai_protocol)) == -1) {
+              perror("server: socket");
+              continue;
+            }
+
+            if (setsockopt(node0, SOL_SOCKET, SO_REUSEADDR, &yes,
+                sizeof(int)) == -1) {
+              perror("setsockopt");
+              exit(1);
+            }
+
+            if (bind(node0, p->ai_addr, p->ai_addrlen) == -1) {
+              close(node0);
+              perror("server: bind");
+              continue;
+            }
+
+            break;
+          }
+
+          if (p == NULL)  {
+            fprintf(stderr, "server: failed to bind\n");
+            // return 2;
+          }
+
+          if (listen(node0, BACKLOG) == -1) {
+            perror("listen");
+            exit(1);
+          }
+
+          //store node0 into pipe_recv_fd
+          p0->pipe_host_id = g_net_link[i].pipe_node0;
+          p0->pipe_recv_fd = node0;
+          memcpy(p0->socket_send_port, g_net_link[i].socket_port1, strlen(g_net_link[i].socket_port1));
+
+          for ( j=0; j<40 && g_net_link[i].socket_url1[j] != '\0'; j++){
+            p0->socket_send_url[j] = g_net_link[i].socket_url1[j];
+          }
+          p0->socket_send_url[j] = '\0';
+
+          p0->next = g_port_list;
+          g_port_list = p0;
+
+          //freeaddrinfo(servinfo); // all done with this structure
+
+        }
     }
+
 
 }
 
@@ -474,7 +552,7 @@ int load_net_data_file()
             }
 
             //would disallow dup ids in single network
-            //forces dup ids between networks
+            //but, would forces dup ids between networks
             /*if (i != node_id) {
                 printf(" net.c: Incorrect node id\n");
                 fclose(fp);
@@ -494,6 +572,8 @@ int load_net_data_file()
     int link_num;
     char link_type;
     int node0, node1;
+    char sock_url0[40], sock_url1[40];
+    char sock_port0[5], sock_port1[5];
 
     fscanf(fp, " %d ", &link_num);
     printf("Number of links = %d\n", link_num);
@@ -514,8 +594,16 @@ int load_net_data_file()
                 g_net_link[i].pipe_node0 = node0;
                 g_net_link[i].pipe_node1 = node1;
             }
-            else {	//need 'S' type for socket   //TODO: SOCKETS
-                printf("   net.c: Unidentified link type\n");
+            else {	//need 'S' type for socket   //TODO: FINISHED
+            //this is first function called in net_init()
+            //this is pulling the data from the config file
+                fscanf(fp," %d %s %s %s %s", &node0, &sock_url0, &sock_port0, &sock_url1, &sock_port1);
+                g_net_link[i].type = SOCKET;
+                g_net_link[i].pipe_node0 = node0;
+                memcpy(g_net_link[i].socket_url0, sock_url0, strlen(sock_url0));
+                memcpy(g_net_link[i].socket_port0, sock_port0, strlen(sock_port0));
+                memcpy(g_net_link[i].socket_url1, sock_url1, strlen(sock_url1));
+                memcpy(g_net_link[i].socket_port1, sock_port1, strlen(sock_port1));
             }
 
         }
@@ -538,11 +626,15 @@ int load_net_data_file()
     for (i=0; i<g_net_link_num; i++) {
         if (g_net_link[i].type == PIPE) {
             printf("   Link (%d, %d) PIPE\n",
-                   g_net_link[i].pipe_node0,
-                   g_net_link[i].pipe_node1);
+                    g_net_link[i].pipe_node0,
+                    g_net_link[i].pipe_node1);
         }
-        else if (g_net_link[i].type == SOCKET) { //TODO: SOCKETS
-            printf("   Socket: to be constructed (net.c)\n");
+        else if (g_net_link[i].type == SOCKET) { //TODO: FINISHED
+            //printing through the sockets
+            printf("   LINK (%d to %s %s) Socket\n",
+                    g_net_link[i].pipe_node0,
+                    g_net_link[i].socket_url1,
+                    g_net_link[i].socket_port1);
         }
     }
 

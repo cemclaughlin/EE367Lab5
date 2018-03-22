@@ -8,4 +8,21 @@ Included:
 *  p2p.config which is a network configuration file for a network
 	with just two host nodes connected by a link (pipe).
 
+//not finished yet
+For each setup: P1(local) (net.c):
+>>use getaddrinfo() on own info
+>>run for loop{
+	>socket() gets new/next useable socketfd(file descriptor, index/identifier-ish)
+	>setsockopt() settings/options 
+	>bind() "assigning a name to the socket"
+>>listen() create a passive listening socket
 
+P2(non-local) (packet.c): //cannot use connect until destination is created
+		//cannot connect twice without closing (probably)
+//copy client.c, tack on close() at end
+>>use getaddrinfo() on other address/port
+>>use socket() to get info
+
+
+For sending:
+>>
