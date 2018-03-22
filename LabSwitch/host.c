@@ -170,7 +170,11 @@ void job_q_add(struct job_queue *j_q, struct host_job *j)
 {
     //printf("\t\tadd: j=%p\n", j);
 
+<<<<<<< HEAD
     j->next == NULL;
+=======
+    j->next = NULL;
+>>>>>>> b8c61c241f858aac376c2f7275c711861ac23248
     if (j_q->head == NULL ) {
         j_q->head = j;
         j_q->tail = j;
@@ -412,6 +416,7 @@ void host_main(int host_id)
                     new_job->type = JOB_PING_SEND_REPLY;
                     job_q_add(&job_q, new_job);
                     break;
+<<<<<<< HEAD
 
                 case (char) PKT_PING_REPLY:
                     ping_reply_received = 1;
@@ -464,6 +469,52 @@ void host_main(int host_id)
                 default:
                     free(in_packet);
                     free(new_job);
+=======
+
+                case (char) PKT_PING_REPLY:
+                    ping_reply_received = 1;
+                    free(in_packet);
+                    free(new_job);
+                    break;
+
+                    /*
+               * The next two packet types
+               * are for the upload file operation.
+               *
+               * The first type is the start packet
+               * which includes the file name in
+               * the payload.
+               *
+               * The second type is the end packet
+               * which carries the content of the file
+               * in its payload
+               */
+
+                case (char) PKT_FILE_UPLOAD_START:
+                    new_job->type
+                            = JOB_FILE_UPLOAD_RECV_START;
+                    job_q_add(&job_q, new_job);
+                    break;
+
+                case (char) PKT_FILE_UPLOAD_END:
+                    new_job->type
+                            = JOB_FILE_UPLOAD_RECV_END;
+                    job_q_add(&job_q, new_job);
+                    break;
+                case (char) PKT_FILE_DOWNLOAD_REQ:
+                    new_job->type = JOB_FILE_UPLOAD_SEND;
+                    for(i=0; i < in_packet->length; ++i){
+                        new_job->fname_upload[i] = in_packet->payload[i];}
+                    new_job->fname_upload[i] = '\0';
+                    new_job->file_upload_dst = in_packet->src;
+                    job_q_add(&job_q, new_job);
+                    free(in_packet);
+                    break;
+
+                default:
+                    free(in_packet);
+                    free(new_job);
+>>>>>>> b8c61c241f858aac376c2f7275c711861ac23248
                 }
             }
             else {
@@ -528,7 +579,11 @@ void host_main(int host_id)
                 //printf("\th%d: doing job \"%s\"\n", host_id, "ping wait");
                 /* Wait for a ping reply packet */
 
+<<<<<<< HEAD
                 if(ping_reply_received == 1) {
+=======
+                if (ping_reply_received == 1) {
+>>>>>>> b8c61c241f858aac376c2f7275c711861ac23248
                     n = sprintf(man_reply_msg, "Ping acked!");
                     man_reply_msg[n] = '\0';
                     write(man_port->send_fd, man_reply_msg, n+1);
@@ -591,6 +646,7 @@ void host_main(int host_id)
                         new_job2->packet = new_packet;
                         job_q_add(&job_q, new_job2);
 
+<<<<<<< HEAD
 /////////////////////////////////////////////////////////////////////////
                    /*
                    * Create the multiple packet which
@@ -613,13 +669,38 @@ void host_main(int host_id)
                		fclose(fp);
 
 			for (i=0; i<n; i++) {
+=======
+                        /*
+                   * Create the second packet which
+                   * has the file contents
+                   */
+                        new_packet = (struct packet *)
+                                     malloc(sizeof(struct packet));
+                        new_packet->dst
+                                = new_job->file_upload_dst;
+                        new_packet->src = (char) host_id;
+                        new_packet->type = PKT_FILE_UPLOAD_END;
+
+
+                        n = fread(string,sizeof(char),
+                                  PKT_PAYLOAD_MAX, fp);
+                        fclose(fp);
+                        string[n] = '\0';
+
+                        for (i=0; i<n; i++) {
+>>>>>>> b8c61c241f858aac376c2f7275c711861ac23248
                             new_packet->payload[i]
                                     = string[i];
                         }
 
                         new_packet->length = n;
+<<<<<<< HEAD
                       
                    /*
+=======
+
+                        /*
+>>>>>>> b8c61c241f858aac376c2f7275c711861ac23248
                    * Create a job to send the packet
                    * and put the job in the job queue
                    */
@@ -631,9 +712,13 @@ void host_main(int host_id)
                         new_job2->packet = new_packet;
                         job_q_add(&job_q, new_job2);
 
+<<<<<<< HEAD
                         free(new_job2);
 
 		}
+=======
+                        free(new_job);
+>>>>>>> b8c61c241f858aac376c2f7275c711861ac23248
                     }
                     else {
                         /* Didn't open file */
@@ -645,6 +730,7 @@ void host_main(int host_id)
 
             case JOB_FILE_UPLOAD_RECV_START:
                 //printf("\th%d: doing job \"%s\"\n", host_id, "upload get start");
+<<<<<<< HEAD
 
                 /* Initialize the file buffer data structure */
                 file_buf_init(&f_buf_upload);
@@ -710,6 +796,23 @@ void host_main(int host_id)
 
 		 break;
 ////////////////////////////////////////////////////////////////////////////////
+=======
+
+                /* Initialize the file buffer data structure */
+                file_buf_init(&f_buf_upload);
+
+                /*
+           * Transfer the file name in the packet payload
+           * to the file buffer data structure
+           */
+                file_buf_put_name(&f_buf_upload,
+                                  new_job->packet->payload,
+                                  new_job->packet->length);
+
+                free(new_job->packet);
+                free(new_job);
+                break;
+>>>>>>> b8c61c241f858aac376c2f7275c711861ac23248
 
             case JOB_FILE_UPLOAD_RECV_END:
                 //printf("\th%d: doing job \"%s\"\n", host_id, "upload get end");
@@ -773,4 +876,8 @@ void host_main(int host_id)
 
     } /* End of while loop */
 
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> b8c61c241f858aac376c2f7275c711861ac23248
