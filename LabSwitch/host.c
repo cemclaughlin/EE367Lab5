@@ -170,7 +170,7 @@ void job_q_add(struct job_queue *j_q, struct host_job *j)
 {
     //printf("\t\tadd: j=%p\n", j);
 
-    j->next == NULL;
+    j->next = NULL;
     if (j_q->head == NULL ) {
         j_q->head = j;
         j_q->tail = j;
@@ -241,7 +241,7 @@ void host_main(int host_id)
 
     int ping_reply_received;
 
-    int i, k, n;
+    int i, j, k, n;
     int dst;
     char name[MAX_FILE_NAME];
     char string[PKT_PAYLOAD_MAX+1];
@@ -444,6 +444,7 @@ void host_main(int host_id)
 			new_job->type
 				= JOB_FILE_UPLOAD_RECV_IMD;
 			job_q_add(&job_q, new_job);
+			break;
 //////////////////////////////////////////////////////////////
 
                 case (char) PKT_FILE_UPLOAD_END:
@@ -597,43 +598,59 @@ void host_main(int host_id)
                    * has the file contents
                    */
 ////////////////////////////////////////////////////////////////////////
-		
+						//make a fread() call to initialize n
+		//n= numbytes read	fread(string=dest , size of each thing it's reading, number of things it's reading, where to read from)	
+						n = fread(string, sizeof(char), PKT_PAYLOAD_MAX, fp);
 	//Splits payload content up into 10 smaller packets
-		for(int i = 0; i <1; i++){
-			new_packet = (struct packet *)
+						for( i = 0; i <10 && n != 0; i++){//control could be !=0 or ==PKT_PAYLOAD_MAX
+						// !=0 requires a check inside the for loop to see if it is the end or not
+						// == PKT_PAYLOAD_MAX immediately breaks the loop when it reads less than the max
+						// and requires 1 more piece of code outside the for loop to make the last packet
+						
+							string[n]='\0'; //testing
+							new_packet = (struct packet *)
                         	              malloc(sizeof(struct packet));
-                	new_packet->dst = new_job->file_upload_dst;
-			new_packet->src = (char) host_id;
-			new_packet->type = PKT_FILE_UPLOAD_IMD;
-		
+							new_packet->dst = new_job->file_upload_dst;
+							new_packet->src = (char) host_id;
+							if ( n < PKT_PAYLOAD_MAX || i ==9) new_packet->type = PKT_FILE_UPLOAD_END;
+							else new_packet->type = PKT_FILE_UPLOAD_IMD;	//if using !=0 control above, needs an if statement to check if middle or end/10th iteration (i==9)
+
 			//This needs to be changed because it is only reading the
 			//first 100 of the payload each time, not sure how to increment the string
-			n = fread(string,sizeof(char),
-                                  	PKT_PAYLOAD_MAX, fp);
-               		fclose(fp);
+			//CT:moved the fclose(fp) statement outside of the for loop, if this didn't fix it then idk
+							
+							//move fread() to end of for loop
 
-			for (i=0; i<n; i++) {
-                            new_packet->payload[i]
-                                    = string[i];
-                        }
+							for (j=0; j<n; j++) {
+								new_packet->payload[j]
+										= string[j];
+							}
+														
+							new_packet->length = n;
 
-                        new_packet->length = n;
-                      
                    /*
                    * Create a job to send the packet
                    * and put the job in the job queue
                    */
 
-                        new_job2 = (struct host_job *)
+							new_job2 = (struct host_job *)
                                    malloc(sizeof(struct host_job));
-                        new_job2->type
+							new_job2->type
                                 = JOB_SEND_PKT_ALL_PORTS;
-                        new_job2->packet = new_packet;
-                        job_q_add(&job_q, new_job2);
+							new_job2->packet = new_packet;
+							job_q_add(&job_q, new_job2);
 
-                        free(new_job2);
+							
+							n = fread(string,sizeof(char),
+                                  	PKT_PAYLOAD_MAX, fp);
 
-		}
+						}
+						//if using ==PKT_PAYLOAD_MAX control in the for loop, make the last packet/job here
+						
+						
+						//close the file after making all of the packets
+						fclose(fp);
+						free(new_job);
                     }
                     else {
                         /* Didn't open file */
@@ -656,6 +673,26 @@ void host_main(int host_id)
                 file_buf_put_name(&f_buf_upload,
                                   new_job->packet->payload,
                                   new_job->packet->length);
+				
+				if (dir_valid == 1) {
+
+                    /*
+               * Get file name from the file buffer
+               * Then open the file
+               */
+                    file_buf_get_name(&f_buf_upload, string);
+                    n = sprintf(name, "./%s/%s", dir, string);
+                    name[n] = '\0';
+                    fp = fopen(name, "w");
+
+                    if (fp != NULL) {
+                        /*
+                   * Write contents in the file
+                   * buffer into file
+                   */
+                        fclose(fp);
+                    }
+                }
 
                 free(new_job->packet);
                 free(new_job);
@@ -663,7 +700,7 @@ void host_main(int host_id)
 
 ///////////////////////////////////////////////////////////////
 ///////////Need to change to deal with intermediate packets
-	case JOB_FILE_UPLOAD_RECV_IMD:
+			case JOB_FILE_UPLOAD_RECV_IMD:
 
 	   /*
            * Download alll packet payloads into one file buffer
@@ -684,7 +721,7 @@ void host_main(int host_id)
                     file_buf_get_name(&f_buf_upload, string);
                     n = sprintf(name, "./%s/%s", dir, string);
                     name[n] = '\0';
-                    fp = fopen(name, "w");
+                    fp = fopen(name, "a");
 
                     if (fp != NULL) {
                         /*
@@ -708,7 +745,7 @@ void host_main(int host_id)
                     }
                 }
 
-		 break;
+				break;
 ////////////////////////////////////////////////////////////////////////////////
 
             case JOB_FILE_UPLOAD_RECV_END:
@@ -734,7 +771,7 @@ void host_main(int host_id)
                     file_buf_get_name(&f_buf_upload, string);
                     n = sprintf(name, "./%s/%s", dir, string);
                     name[n] = '\0';
-                    fp = fopen(name, "w");
+                    fp = fopen(name, "a");
 
                     if (fp != NULL) {
                         /*
