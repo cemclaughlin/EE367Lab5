@@ -8,8 +8,20 @@ struct switch_job {
 	int in_port_index;
 	//int file_upload_dst;
 	struct switch_job *next;
+	char localRootID;
+	int localRootDist;
+	char localParent;
+	char localPortTree[k];
 };
 
+/*
+struct switch_local_tree{
+	char localRootID;
+	int localRootDist;
+	char localParent;
+	char localPortTree[k];
+}
+*/
 
 struct switch_job_queue {
 	struct switch_job *head;

@@ -178,6 +178,7 @@ void job_q_add(struct job_queue *j_q, struct host_job *j)
     }
     else {
         (j_q->tail)->next = j;
+        j->next = NULL;
         j_q->tail = j;
         j_q->occ++;
     }

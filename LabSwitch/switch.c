@@ -120,6 +120,8 @@ void switch_main(int host_id)
 
     struct packet *in_packet; /* Incoming packet */
     struct packet *new_packet;
+    struct treepacket *in_tree_packet; /*Incoming tree packet*/
+    struct treepacket *out_tree_packet;
 
     struct net_port *p;
     struct switch_job *new_job;
@@ -176,6 +178,12 @@ void switch_main(int host_id)
                           malloc(sizeof(struct switch_job));
                 new_job->in_port_index = k;
                 new_job->packet = in_packet;
+                ///////////////////////////////////////////
+                /////Add local tree info initilization ////
+                new_job->localRootID = host_id;
+                new_job->localrootDist = 0;
+                new_job->localParent = NULL;
+                new_job->localPortTree[k] = Y;
 
                 //if in_port_index is not in routing_table, add it in
                 if( (i = find_routing_entry(routing_table,in_packet->src)) < 0) {
