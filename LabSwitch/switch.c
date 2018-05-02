@@ -108,13 +108,14 @@ void add_routing_entry(struct routing_table_entry rt[], char key, int num){
 
 void switch_main(int host_id)
 {
-	
+
     struct net_port *node_port_list;
     struct net_port **node_port;  // Array of pointers to node ports
     int node_port_num;            // Number of node ports
 
     int i, k, n;
     int dst;
+    int pid;
 
     FILE *fp;
 
@@ -128,6 +129,10 @@ void switch_main(int host_id)
     struct switch_job *new_job2;
 
     struct switch_job_queue job_q;
+    struct switch_job_queue tree_q;
+
+    struct switch_local_tree old_tree;
+    struct switch_local_tree new_tree;
 
     //creating and initializing routing table
     struct routing_table_entry routing_table[MAX_ROUTING_TABLE_SIZE];
@@ -167,6 +172,28 @@ void switch_main(int host_id)
    * Get packets from incoming links and translate to jobs
    * Put jobs in job queue
    */
+        if((pid=fork()) == 0){
+          //TREEEEEEES
+          ///////////////////////////////////////////
+          /////Add local tree info initilization ////
+          new_tree.localRootID = host_id;
+          new_tree.localRootDist = 0;
+          new_tree.localParent = NULL;
+          //new_tree.localPortTree[] = ;
+
+          //send initial information
+
+
+          //read replys
+
+          //compare/update as necessary
+
+          //if changed, resend information
+
+          //after each send, create a TTL job?
+
+          //end?
+        }
 
         for (k = 0; k < node_port_num; k++) { /* Scan all ports */
 
@@ -174,22 +201,23 @@ void switch_main(int host_id)
             n = packet_recv(node_port[k], in_packet);
 
             if (n > 0)  { //changed to simple read if there is a packet
+
                 new_job = (struct switch_job *)
                           malloc(sizeof(struct switch_job));
                 new_job->in_port_index = k;
                 new_job->packet = in_packet;
-                ///////////////////////////////////////////
-                /////Add local tree info initilization ////
-                new_job->localRootID = host_id;
-                new_job->localrootDist = 0;
-                new_job->localParent = NULL;
-                new_job->localPortTree[k] = Y;
+
+                if(packet->type == PKT_TREE){
+                  switch_job_q_add(&tree_q, new_job);
+                }
 
                 //if in_port_index is not in routing_table, add it in
-                if( (i = find_routing_entry(routing_table,in_packet->src)) < 0) {
-                  add_routing_entry(routing_table, in_packet->src ,k);
+                else {
+                    if( (i = find_routing_entry(routing_table,in_packet->src)) < 0) {
+                      add_routing_entry(routing_table, in_packet->src ,k);
+                    }
+                    switch_job_q_add(&job_q, new_job);
                 }
-                switch_job_q_add(&job_q, new_job);
             }
             else {  //remove this?
                 free(in_packet);
@@ -230,6 +258,8 @@ void switch_main(int host_id)
 
         /* The host goes to sleep for 10 ms */
         usleep(TENMILLISEC);
+
+      wait(); //may cause problems OTL
 
     } /* End of while loop */
 

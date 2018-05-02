@@ -38,15 +38,6 @@ struct packet { /* struct for a packet */
 	char payload[PAYLOAD_MAX];
 };
 
-/* Tree packet */
-
-struct treepacket{
-	char packetRootID;
-	int packetRootDist;
-	char packetSenderTyoe;
-	char packetSendChild;
-}
-
 /* Types of packets */
 
 #define PKT_PING_REQ		0
@@ -55,3 +46,4 @@ struct treepacket{
 #define PKT_FILE_UPLOAD_END	3
 #define PKT_FILE_DOWNLOAD_REQ   5
 #define PKT_FILE_UPLOAD_IMD	6
+#define PKT_TREE 7
