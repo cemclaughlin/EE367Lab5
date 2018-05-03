@@ -34,16 +34,16 @@ struct switch_job_queue {
 	struct switch_job *tail;
 	int occ;
 };
-
-struct thread_arg {
-	struct switch_local_tree * tree_struct;
-	int * inTree;
-	int num_ports;
-	int switch_id;
-	struct switch_job_queue * job_q;
-	struct switch_job_queue * tree_q;
-	int * finalize;
-};
+// 
+// struct thread_arg {
+// 	struct switch_local_tree * tree_struct;
+// 	int * inTree;
+// 	int num_ports;
+// 	int switch_id;
+// 	struct switch_job_queue * job_q;
+// 	struct switch_job_queue * tree_q;
+// 	int * finalize;
+// };
 
 struct routing_table_entry{
 	char key;

@@ -8,7 +8,6 @@
 
 #include <unistd.h>
 #include <fcntl.h>
-#include <pthread.h>
 
 #include "main.h"
 #include "net.h"
@@ -104,88 +103,6 @@ void add_routing_entry(struct routing_table_entry rt[], char key, int num){
   return;
 }
 
-void *treeCreation(void *vargp){
-  struct thread_arg * threadArgs = vargp;
-  struct packet * newPacket;
-  struct switch_job * new_tree_job;
-  struct switch_job * read_job;
-  int temp_index;
-
-  while(1){
-    //init tree data for a tree creation session
-    threadArgs->tree_struct->localRootID = threadArgs->switch_id;
-    threadArgs->tree_struct->localRootDist = 0;
-    threadArgs->tree_struct->localParent = '\04';
-    threadArgs->finalize = 0;
-
-    //make packet for tree discovery job
-    newPacket = (struct packet *) malloc(sizeof(struct packet));
-    newPacket->src = threadArgs->tree_struct->localRootID;
-    newPacket->dst = (char) threadArgs->tree_struct->localRootDist;
-    newPacket->type = (char) PKT_TREE;
-    newPacket->length = 2;
-    newPacket->payload[0]='H';
-    newPacket->payload[1]='N';
-
-    //attach packet to job and add to job_q
-    new_tree_job = (struct switch_job *) malloc(sizeof(struct switch_job));
-    new_tree_job->packet = newPacket;
-    new_tree_job->in_port_index = -1;
-    new_tree_job->type = JOB_TREE_SEND;
-    switch_job_q_add(threadArgs->job_q, new_tree_job);
-
-    //init done, creating main tree creation loop
-    while(threadArgs->finalize==0){
-      //if there's a new tree packet to read
-      if (switch_job_q_num(threadArgs->tree_q) > 0){
-        read_job = switch_job_q_remove(threadArgs->tree_q);
-        temp_index = read_job->in_port_index;
-
-        //if new root_id is lower OR (new_root_id is same and new_dist is lower)
-        if(read_job->packet->src < threadArgs->tree_struct->localRootID ||
-          (read_job->packet->src == threadArgs->tree_struct->localRootID &&
-            (int) read_job->packet->dst < threadArgs->tree_struct->localRootDist - 1)){
-          //update tree information
-          threadArgs->tree_struct->localRootID = read_job->packet->src;
-          threadArgs->tree_struct->localRootDist = (int) read_job->packet->dst + 1;
-          threadArgs->tree_struct->localParent = temp_index;
-
-          //reset inTree flags
-          for( int t = 0; t < threadArgs->num_ports; t++){
-            if(t == temp_index) threadArgs->inTree[t] = 1;  //setting the parent
-            else threadArgs->inTree[t] = 0;
-          }
-
-          //make packet for tree discovery job
-          newPacket = (struct packet *) malloc(sizeof(struct packet));
-          newPacket->src = threadArgs->tree_struct->localRootID;
-          newPacket->dst = (char) threadArgs->tree_struct->localRootDist;
-          newPacket->type = (char) PKT_TREE;
-          newPacket->length = 2;
-          newPacket->payload[0]='S';
-          newPacket->payload[1]='N';
-
-          //attach packet to job and add to job_q
-          new_tree_job = (struct switch_job *) malloc(sizeof(struct switch_job));
-          new_tree_job->packet = newPacket;
-          new_tree_job->in_port_index = temp_index;
-          new_tree_job->type = JOB_TREE_SEND;
-          switch_job_q_add(threadArgs->job_q, new_tree_job);
-        }
-        //if the sender is child, or if type='H' add to inTree
-        if(read_job->packet->payload[0] == 'H' || read_job->packet->payload[1] == 'Y'){
-          threadArgs->inTree[temp_index]=1;
-        }
-
-
-      }
-    }
-    //sleep
-    usleep(TENMILLISEC);
-  }
-
-}
-
 /*
 *  Main
 */
@@ -202,7 +119,7 @@ void switch_main(int switch_id)
     int pid;
     int tree_ttl; //for JOB_TREE_WAITING time-to-live
     int * switch_in_tree;
-    int * thread_in_tree;
+    int * temp_in_tree;
     int finalize;
 
     FILE *fp;
@@ -212,6 +129,10 @@ void switch_main(int switch_id)
     //struct treepacket *in_tree_packet; /*Incoming tree packet*/
     //struct treepacket *out_tree_packet;
 
+    struct packet * child_new_packet;
+    struct switch_job * new_tree_job;
+    struct switch_job * read_job;
+
     struct net_port *p;
     struct switch_job *new_job;
     struct switch_job *new_job2;
@@ -220,10 +141,7 @@ void switch_main(int switch_id)
     struct switch_job_queue tree_q;
 
     struct switch_local_tree switch_tree;
-    struct switch_local_tree thread_tree;
-    struct thread_arg * thread_args;
-    pthread_t tid;
-
+    struct switch_local_tree temp_tree;
     //creating and initializing routing table
     struct routing_table_entry routing_table[MAX_ROUTING_TABLE_SIZE];
     routing_table_init(routing_table);
@@ -244,13 +162,13 @@ void switch_main(int switch_id)
                 malloc(node_port_num*sizeof(struct net_port *));
 
     switch_in_tree = (int *) malloc(node_port_num*sizeof(int));
-    thread_in_tree = (int *) malloc(node_port_num*sizeof(int));
+    temp_in_tree = (int *) malloc(node_port_num*sizeof(int));
     /* Load ports into the array */ //also init in_tree arrays
     p = node_port_list;
     for (k = 0; k < node_port_num; k++) {
         node_port[k] = p;
         switch_in_tree[k] = 0;
-        thread_in_tree[k] = 0;
+        temp_in_tree[k] = 0;
         p = p->next;
     }
 
@@ -258,16 +176,80 @@ void switch_main(int switch_id)
     switch_job_q_init(&job_q);
     switch_job_q_init(&tree_q);
 
-    thread_args = (struct thread_arg *)malloc(sizeof(struct thread_arg));
-    thread_args->tree_struct = &thread_tree;
-    thread_args->inTree = thread_in_tree;
-    thread_args->num_ports = node_port_num;
-    thread_args->switch_id = switch_id;
-    thread_args->job_q = &job_q;
-    thread_args->tree_q = &tree_q;
-    thread_args->finalize = &finalize;
+    //tree creation
+    if((pid=fork()) ==0){
+      while(1){
+        //init tree data for a tree creation session
+        temp_tree.localRootID = switch_id;
+        temp_tree.localRootDist = 0;
+        temp_tree.localParent = '\04';
+        finalize = 0;
 
-    pthread_create(&tid, NULL, treeCreation, (void *)thread_args);
+        //make packet for tree discovery job
+        child_new_packet = (struct packet *) malloc(sizeof(struct packet));
+        child_new_packet->src = temp_tree.localRootID;
+        child_new_packet->dst = (char) temp_tree.localRootDist;
+        child_new_packet->type = (char) PKT_TREE;
+        child_new_packet->length = 2;
+        child_new_packet->payload[0]='H';
+        child_new_packet->payload[1]='N';
+
+        //attach packet to job and add to job_q
+        new_tree_job = (struct switch_job *) malloc(sizeof(struct switch_job));
+        new_tree_job->packet = child_new_packet;
+        new_tree_job->in_port_index = -1;
+        new_tree_job->type = JOB_TREE_SEND;
+        switch_job_q_add(&job_q, new_tree_job);
+
+        //init done, creating main tree creation loop
+        while(finalize==0){
+          //if there's a new tree packet to read
+          if (switch_job_q_num(&tree_q) > 0){
+            read_job = switch_job_q_remove(&tree_q);
+
+            //if new root_id is lower OR (new_root_id is same and new_dist is lower)
+            if(read_job->packet->src < temp_tree.localRootID ||
+              (read_job->packet->src == temp_tree.localRootID &&
+                (int) read_job->packet->dst < temp_tree.localRootDist - 1)){
+              //update tree information
+              temp_tree.localRootID = read_job->packet->src;
+              temp_tree.localRootDist = (int) read_job->packet->dst + 1;
+              temp_tree.localParent = read_job->in_port_index;
+
+              //reset inTree flags
+              for( int t = 0; t < node_port_num; t++){
+                if(t == read_job->in_port_index) temp_in_tree[t] = 1;  //setting the parent
+                else temp_in_tree[t] = 0;
+              }
+
+              //make packet for tree discovery job
+              child_new_packet = (struct packet *) malloc(sizeof(struct packet));
+              child_new_packet->src = temp_tree.localRootID;
+              child_new_packet->dst = (char) temp_tree.localRootDist;
+              child_new_packet->type = (char) PKT_TREE;
+              child_new_packet->length = 2;
+              child_new_packet->payload[0]='S';
+              child_new_packet->payload[1]='N';
+
+              //attach packet to job and add to job_q
+              new_tree_job = (struct switch_job *) malloc(sizeof(struct switch_job));
+              new_tree_job->packet = child_new_packet;
+              new_tree_job->in_port_index = read_job->in_port_index;
+              new_tree_job->type = JOB_TREE_SEND;
+              switch_job_q_add(&job_q, new_tree_job);
+            }
+            //if the sender is child, or if type='H' add to inTree
+            if(read_job->packet->payload[0] == 'H' || read_job->packet->payload[1] == 'Y'){
+              temp_in_tree[read_job->in_port_index]=1;
+            }
+
+
+          }
+        }
+        //sleep
+        usleep(TENMILLISEC);
+      }
+    }
 
     //printf("\th%d: online\n", switch_id);
 
@@ -357,11 +339,11 @@ void switch_main(int switch_id)
               if(tree_ttl<=1){  //if dieing aka TimeToLive is over
                 finalize = 1;   //flag thread to sleep
                 //move tree data from thread to switch
-                switch_tree.localRootID = thread_tree.localRootID;
-                switch_tree.localRootDist = thread_tree.localRootDist;
-                switch_tree.localParent = thread_tree.localParent;
+                switch_tree.localRootID = temp_tree.localRootID;
+                switch_tree.localRootDist = temp_tree.localRootDist;
+                switch_tree.localParent = temp_tree.localParent;
                 for(k = 0; k < node_port_num; k++){//copy in_tree array
-                  switch_in_tree[k] = thread_in_tree[k];
+                  switch_in_tree[k] = temp_in_tree[k];
                 }
               }
               else{ //not time to die
