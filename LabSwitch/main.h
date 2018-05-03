@@ -31,11 +31,11 @@ struct net_port { /* port to communicate with another node */
 /* Packet sent between nodes  */
 
 struct packet { /* struct for a packet */
-	char src;
-	char dst;
-	char type;
+	char src;		//tree: root_id
+	char dst;		//tree: distance
+	char type;	//tree: PKT_TREE
 	int length;
-	char payload[PAYLOAD_MAX];
+	char payload[PAYLOAD_MAX];	//sender type H/S and child Y/N
 };
 
 /* Types of packets */
