@@ -462,6 +462,12 @@ void host_main(int host_id)
                     job_q_add(&job_q, new_job);
                     free(in_packet);
                     break;
+                //response to tree_packets
+                case (char) PKT_TREE:
+                    new_job->type = JOB_TREE_HOST_REPLY;
+                    job_q_add(&job_q, new_job);
+                    free(in_packet);
+                    break;
 
                 default:
                     free(in_packet);
@@ -600,14 +606,14 @@ void host_main(int host_id)
                    */
 ////////////////////////////////////////////////////////////////////////
 						//make a fread() call to initialize n
-		//n= numbytes read	fread(string=dest , size of each thing it's reading, number of things it's reading, where to read from)	
+		//n= numbytes read	fread(string=dest , size of each thing it's reading, number of things it's reading, where to read from)
 						n = fread(string, sizeof(char), PKT_PAYLOAD_MAX, fp);
 	//Splits payload content up into 10 smaller packets
 						for( i = 0; i <10 && n != 0; i++){//control could be !=0 or ==PKT_PAYLOAD_MAX
 						// !=0 requires a check inside the for loop to see if it is the end or not
 						// == PKT_PAYLOAD_MAX immediately breaks the loop when it reads less than the max
 						// and requires 1 more piece of code outside the for loop to make the last packet
-						
+
 							string[n]='\0'; //testing
 							new_packet = (struct packet *)
                         	              malloc(sizeof(struct packet));
@@ -619,14 +625,14 @@ void host_main(int host_id)
 			//This needs to be changed because it is only reading the
 			//first 100 of the payload each time, not sure how to increment the string
 			//CT:moved the fclose(fp) statement outside of the for loop, if this didn't fix it then idk
-							
+
 							//move fread() to end of for loop
 
 							for (j=0; j<n; j++) {
 								new_packet->payload[j]
 										= string[j];
 							}
-														
+
 							new_packet->length = n;
 
                    /*
@@ -641,14 +647,14 @@ void host_main(int host_id)
 							new_job2->packet = new_packet;
 							job_q_add(&job_q, new_job2);
 
-							
+
 							n = fread(string,sizeof(char),
                                   	PKT_PAYLOAD_MAX, fp);
 
 						}
 						//if using ==PKT_PAYLOAD_MAX control in the for loop, make the last packet/job here
-						
-						
+
+
 						//close the file after making all of the packets
 						fclose(fp);
 						free(new_job);
@@ -674,7 +680,7 @@ void host_main(int host_id)
                 file_buf_put_name(&f_buf_upload,
                                   new_job->packet->payload,
                                   new_job->packet->length);
-				
+
 				if (dir_valid == 1) {
 
                     /*
@@ -797,6 +803,25 @@ void host_main(int host_id)
                 }
 
                 break;
+
+            case JOB_TREE_HOST_REPLY:
+
+            new_packet = (struct packet *)
+                                      malloc(sizeof(struct packet));
+            new_packet->dst = new_job->packet->dst ;
+            new_packet->src = new_job->packet->src;
+            new_packet->type = PKT_TREE;
+            new_packet->length = 2;
+            new_packet->payload[0]= 'H';
+            new_packet->payload[1]= 'Y';
+
+            new_job2 = (struct host_job *)
+                                 malloc(sizeof(struct host_job));
+            new_job2->type
+                              = JOB_SEND_PKT_ALL_PORTS;
+            new_job2->packet = new_packet;
+            job_q_add(&job_q, new_job2);
+
             default:
 
                 //printf("\th%d: doing job \"%s\"\n", host_id, "unknown");
