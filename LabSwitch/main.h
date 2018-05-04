@@ -6,7 +6,8 @@
 
 enum NetNodeType { /* Types of network nodes */
 	HOST,
-	SWITCH
+	SWITCH,
+	DNS
 };
 
 enum NetLinkType { /* Types of linkls */
@@ -15,7 +16,7 @@ enum NetLinkType { /* Types of linkls */
 };
 
 struct net_node { /* Network node, e.g., host or switch */
-	enum NetNodeType type;	//either Host or Switch
+	enum NetNodeType type;	//either Host or Switch or DNS
 	int id;
 	struct net_node *next;
 };
@@ -47,3 +48,6 @@ struct packet { /* struct for a packet */
 #define PKT_FILE_DOWNLOAD_REQ   5
 #define PKT_FILE_UPLOAD_IMD	6
 #define PKT_TREE 7
+#define DNS_REQ 8
+#define DNS_REPLY 9
+#define DNS_REGISTER 10

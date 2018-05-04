@@ -12,6 +12,7 @@
 #include "man.h"
 #include "host.h"
 #include "switch.h"
+#include "DNS.h"
 
 
 void main()
@@ -48,6 +49,9 @@ void main()
             }
             else if (p_node->type == SWITCH) {
                 switch_main(p_node->id);
+            }
+            else if (p_node->type == DNS){
+                dns_main(p_node->id);
             }
             return;
         }

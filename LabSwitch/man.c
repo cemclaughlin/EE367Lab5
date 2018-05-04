@@ -20,6 +20,7 @@
 #define PIPE_READ  0
 #define TENMILLISEC 10000
 #define DELAY_FOR_HOST_REPLY 10  /* Delay in ten of milliseconds */
+#define HOST_NAME_LENGTH 20
 
 void display_host(struct man_port_at_man *list,
                   struct man_port_at_man *curr_host);
@@ -29,6 +30,7 @@ void display_host(struct man_port_at_man *list,
                   struct man_port_at_man *curr_host);
 void display_host_state(struct man_port_at_man *curr_host);
 void set_host_dir(struct man_port_at_man *curr_host);
+void register_host(struct man_port_at_man *curr_host);
 char man_get_user_cmd(int curr_host);
 
 
@@ -47,6 +49,7 @@ char man_get_user_cmd(int curr_host)
         printf("   (p) Ping a host\n");
         printf("   (u) Upload a file to a host\n");
         printf("   (d) Download a file from a host\n");
+        //printf("   (r) Register a name for the current host\n");
         printf("   (q) Quit\n");
         printf("   Enter Command: ");
         do {
@@ -63,6 +66,7 @@ char man_get_user_cmd(int curr_host)
         case 'p':
         case 'u':
         case 'd':
+        case 'r':
         case 'q': return cmd;
         default:
             printf("Invalid: you entered %c\n\n", cmd);
@@ -149,6 +153,18 @@ void set_host_dir(struct man_port_at_man *curr_host)
     write(curr_host->send_fd, msg, n);
 }
 
+void register_host(struct man_port_at_man *curr_host)
+{
+    char name[NAME_LENGTH];
+    char msg[NAME_LENGTH];
+    int n;
+
+    printf("Enter host name: ");
+    scanf("%s", name);
+    n = sprintf(msg, "r %s", name);
+    write(curr_host->send_fd, msg, n);
+}
+
 /*
  * Command host to send a ping to the host with id "curr_host"
  *
@@ -165,12 +181,12 @@ void ping(struct man_port_at_man *curr_host)
 {
     char msg[MAN_MSG_LENGTH];
     char reply[MAN_MSG_LENGTH];
-    int host_to_ping;
+    char host_to_ping[HOST_NAME_LENGTH];
     int n;
 
     printf("Enter id of host to ping: ");
-    scanf("%d", &host_to_ping);
-    n = sprintf(msg, "p %d", host_to_ping);
+    scanf("%s", &host_to_ping);
+    n = sprintf(msg, "p %s", host_to_ping);
 
     write(curr_host->send_fd, msg, n);
 
@@ -193,24 +209,24 @@ void ping(struct man_port_at_man *curr_host)
  *    - id of the host to ping.
  *
  * A command message is sent to the current host.
- *    The message starrts with 'u' followed by the
+ *    The message starts with 'u' followed by the
  *    -  id of the destination host
  *    -  name of file to transfer
  */
 int file_upload(struct man_port_at_man *curr_host)
 {
     int n;
-    int host_id;
+    char host_id[HOST_NAME_LENGTH];
     char name[NAME_LENGTH];
     char msg[NAME_LENGTH];
 
     printf("Enter file name to upload: ");
     scanf("%s", name);
     printf("Enter host id of destination:  ");
-    scanf("%d", &host_id);
+    scanf("%s", &host_id);
     printf("\n");
 
-    n = sprintf(msg, "u %d %s", host_id, name);
+    n = sprintf(msg, "u %s %s", host_id, name);
     write(curr_host->send_fd, msg, n);
     usleep(TENMILLISEC);
     return 0;
@@ -219,17 +235,17 @@ int file_upload(struct man_port_at_man *curr_host)
 int file_download(struct man_port_at_man *host_list, struct man_port_at_man *curr_host)
 {
     int n;
-    int host_id;
+    char host_id[HOST_NAME_LENGTH];
     char name[NAME_LENGTH];
     char msg[NAME_LENGTH];
 
     printf("Enter file name to Download: ");
     scanf("%s", name);
     printf("Enter host id of location: ");
-    scanf("%d", &host_id);
+    scanf("%s", &host_id);
     printf("\n");
 
-    n = sprintf(msg, "d %d %s", host_id, name);
+    n = sprintf(msg, "d %s %s", host_id, name);
     write(curr_host->send_fd, msg, n);
     usleep(TENMILLISEC);
 
@@ -282,6 +298,9 @@ void man_main()
         case 'd': /* Download a file from a host */
             file_download(host_list, curr_host);
             break;
+		case 'r': /* Register a name for the current host */
+			register_host(curr_host);
+			break;
         case 'q':  /* Quit */
             return;
         default:

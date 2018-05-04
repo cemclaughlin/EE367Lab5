@@ -12,6 +12,7 @@ enum host_job_type {
 	JOB_FILE_UPLOAD_RECV_END,
 	JOB_FILE_UPLOAD_RECV_IMD,
 	JOB_TREE_HOST_REPLY,
+	JOB_DNS_WAIT_FOR_REPLY,
 };
 
 struct host_job {
